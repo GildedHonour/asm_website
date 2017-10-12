@@ -17,11 +17,11 @@ segment readable writeable
     }
 
     http_response_200_ok:
-      db "HTTP/1.1 200 OK", 13, 10
-      db "Content-Type: %s", 13, 10
-      db "Content-Length: %d", 13, 10
-      db 13, 10
-      db "%s", 0
+        db "HTTP/1.1 200 OK", 13, 10
+        db "Content-Type: %s", 13, 10
+        db "Content-Length: %d", 13, 10
+        db 13, 10
+        db "%s", 0
 
     clt_socket dq ?
     srv_socket dq ?
@@ -29,10 +29,7 @@ segment readable writeable
     html_page1_file_name db "web/page1.html", 0
     html_page1_file_handle dq ?
     
-    ;html_page1_file_buff: times 1000 db ?
-    ;html_page1_file_buff rb 1000
-    ; html_page1_file_buff db 0 dup 1000
-    html_page1_file_buff db 1000 dup(0)
+    html_page1_file_buff rb 1000
     html_page1_file_buff_len equ $ - html_page1_file_buff
 
     error_msg_format db "something went wrong %d", 10, 0
@@ -45,6 +42,9 @@ segment readable
     PORT equ 8080
     AF_INET equ 2
     SOCK_STREAM equ 1
+    SYS_CLOSE_CALL equ 3
+    SYS_BIND_CALL equ 0x31
+    SYS_LISTEN_CALL equ 50
 
 segment readable executable
 entry $
@@ -91,11 +91,11 @@ print_html_file:
 
 cleanup:
     ; close sockets
-    mov rax, 3
+    mov rax, SYS_CLOSE_CALL
     mov rdi, [clt_socket]
     syscall
 
-    mov rax, 3
+    mov rax, SYS_CLOSE_CALL
     mov rdi, [srv_socket]
     syscall
 
@@ -118,17 +118,36 @@ create_server_socket:
     mov rdx, 0
     call [socket]
 
-    test rax, rax
+    cmp rax, 0
     je error
-
     mov [srv_socket], rax
+    xor rax, rax
+
 
 
     ; todo
-    call [bind]
 
-    ; todo
-    call [listen]
+    ;bind(sock, addr, sizeof sockaddr_in)
+    mov rdi, [srv_socket]
+
+    push AF_INET
+    push 0xc308 ;1988
+    push 0
+    mov rsi, rsp
+
+    mov rdx, 0x10 ; size of sockaddr_in: 2 + 2 + 4 + 8
+    mov rax, SYS_BIND_CALL
+    syscall
+    cmp rax, 0
+
+    ; listen
+    mov rdi, [srv_socket]
+    mov rsi, 0
+    mov rax, SYS_LISTEN_CALL
+    syscall
+
+
+
 
 
 accept_client_connection:

@@ -5,16 +5,32 @@ interpreter "/lib64/ld-linux-x86-64.so.2"
 needed "libc.so.6"
 import printf, close, fopen, listen, socket, bind, accept
 
+segment readable
+    PORT equ 8080
+    AF_INET equ 2
+    SOCK_STREAM equ 1
+    SYS_CLOSE_CALL equ 3
+    SYS_BIND_CALL equ 0x31
+    SYS_LISTEN_CALL equ 50
+    SYS_ACCEPT_CALL equ 43
+    SYS_WRITE_CALL equ 1
+
 segment readable writeable
     server_hello_msg db "server running on the port %d...", 10, 0
     localhost_ip_addr db "0.0.0.0", 0
 
-    struc sockaddr_in sin_family, sin_port, sin_addr, sin_zero {
-      .sin_family dw,
-      .sin_port dw,
-      .sin_addr dd,
-      .sin_zero dq,
+    struc sockaddr_in a, b, c, d {
+      .sin_family dw a
+      .sin_port dw b
+      .sin_addr dd c
+      .sin_zero dq d
     }
+
+    ; sockaddr_in_len equ $ - sockaddr_in
+
+    srv_sockaddr_in sockaddr_in AF_INET, 0, 0, 0
+    clt_sockaddr_in sockaddr_in ?, ?, ?, ?
+    clt_sockaddr_in_len equ $ - clt_sockaddr_in
 
     http_response_200_ok:
         db "HTTP/1.1 200 OK", 13, 10
@@ -37,14 +53,6 @@ segment readable writeable
     open_file_msg db "opening file", 10, 0
     read_file_msg db "reading file", 13, 10, 0
     print_content_file_msg_format db "content: ", 13, 10, 13, 10, "%s", 13, 10, 0
-
-segment readable
-    PORT equ 8080
-    AF_INET equ 2
-    SOCK_STREAM equ 1
-    SYS_CLOSE_CALL equ 3
-    SYS_BIND_CALL equ 0x31
-    SYS_LISTEN_CALL equ 50
 
 segment readable executable
 entry $
@@ -89,6 +97,9 @@ print_html_file:
     mov rdi, [html_page1_file_handle]
     syscall
 
+    ; todo
+    jmp create_server_socket
+
 cleanup:
     ; close sockets
     mov rax, SYS_CLOSE_CALL
@@ -124,14 +135,11 @@ create_server_socket:
     xor rax, rax
 
 
-
-    ; todo
-
     ;bind(sock, addr, sizeof sockaddr_in)
     mov rdi, [srv_socket]
 
     push AF_INET
-    push 0xc308 ;1988
+    push 0x270f ;1988 or 8819
     push 0
     mov rsi, rsp
 
@@ -146,9 +154,19 @@ create_server_socket:
     mov rax, SYS_LISTEN_CALL
     syscall
 
-
-
-
-
-accept_client_connection:
+    ; accept
+    mov rdi, [srv_socket]
+    mov rsi, clt_sockaddr_in
+    mov rdx, clt_sockaddr_in_len
+    mov rax, SYS_ACCEPT_CALL
+    syscall
     
+    ; todo check error
+
+    mov [clt_socket], rax
+
+serve_client:
+    ; todo
+    mov rdi, [clt_socket]
+    mov rax, SYS_WRITE_CALL
+    syscall

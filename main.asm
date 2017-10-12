@@ -16,7 +16,6 @@ segment readable
     SYS_WRITE_CALL equ 1
 
 segment readable writeable
-    server_hello_msg db "server running on the port %d...", 10, 0
     localhost_ip_addr db "0.0.0.0", 0
 
     struc sockaddr_in a, b, c, d {
@@ -26,18 +25,9 @@ segment readable writeable
       .sin_zero dq d
     }
 
-    ; sockaddr_in_len equ $ - sockaddr_in
-
     srv_sockaddr_in sockaddr_in AF_INET, 0, 0, 0
     clt_sockaddr_in sockaddr_in ?, ?, ?, ?
     clt_sockaddr_in_len equ $ - clt_sockaddr_in
-
-    http_response_200_ok:
-        db "HTTP/1.1 200 OK", 13, 10
-        db "Content-Type: %s", 13, 10
-        db "Content-Length: %d", 13, 10
-        db 13, 10
-        db "%s", 0
 
     clt_socket dq ?
     srv_socket dq ?
@@ -48,16 +38,27 @@ segment readable writeable
     html_page1_file_buff rb 1000
     html_page1_file_buff_len equ $ - html_page1_file_buff
 
-    error_msg_format db "something went wrong %d", 10, 0
-    error_msg_len equ $ - error_msg
-    open_file_msg db "opening file", 10, 0
-    read_file_msg db "reading file", 13, 10, 0
-    print_content_file_msg_format db "content: ", 13, 10, 13, 10, "%s", 13, 10, 0
+
+  msg:
+      .print_content_file_format db "content: ", 13, 10, 13, 10, "%s", 13, 10, 0
+      .error_format db "something went wrong %d", 10, 0
+      .error.len equ $ - msg.error
+      .open_file db "opening file", 10, 0
+      .read_file db "reading file", 13, 10, 0
+      .server_hello db "server running on the port %d...", 10, 0
+
+      .http_response_200_ok:
+          db "HTTP/1.1 200 OK", 13, 10
+          db "Content-Type: %s", 13, 10
+          db "Content-Length: %d", 13, 10
+          db 13, 10
+          db "%s", 0
+
 
 segment readable executable
 entry $
     ; print hello message
-    mov rdi, server_hello_msg
+    mov rdi, msg.server_hello
     mov rsi, PORT
     call [printf]
     jmp print_html_file
@@ -65,7 +66,7 @@ entry $
 
 print_html_file:
     ; open html file
-    mov rdi, open_file_msg
+    mov rdi, msg.open_file
     call [printf]
     mov rax, 2
     mov rdi, html_page1_file_name
@@ -79,7 +80,7 @@ print_html_file:
     xor rax, rax
 
     ; read
-    mov rdi, read_file_msg
+    mov rdi, msg.read_file
     call [printf]
 
     mov rax, 0
@@ -88,7 +89,7 @@ print_html_file:
     mov rdx, html_page1_file_buff_len
     syscall
 
-    mov rdi, print_content_file_msg_format
+    mov rdi, msg.print_content_file_format
     mov rsi, html_page1_file_buff
     call [printf]
 
@@ -117,7 +118,7 @@ exit:
     ret
 
 error:
-    mov rdi, error_msg_format
+    mov rdi, msg.error_format
     mov rsi, rax
     call [printf]
     jmp exit

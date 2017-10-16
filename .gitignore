@@ -1,4 +1,7 @@
 fasm
 old
 main_exe
+main
 test1_hello64.asm
+notes.txt
+*.fas
